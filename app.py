@@ -1,164 +1,151 @@
 import streamlit as st
 import requests
+import pandas as pd
 
-# ======================================
-# Page Config
-# ======================================
+# =========================
+# CONFIG
+# =========================
+BACKEND_URL = "https://runwayai-startup-risk-1.onrender.com/predict"
+
 st.set_page_config(
-    page_title="RunwayAI",
-    layout="centered"
+    page_title="RunwayAI – Risk Intelligence Dashboard",
+    layout="wide"
 )
 
-st.title("🚀 RunwayAI – Startup Failure Risk Predictor")
+st.title("🚀 RunwayAI – Startup Risk Intelligence")
 st.write(
-    "This tool predicts the **risk of startup failure** and explains "
-    "**which factors increased or reduced that risk**."
+    "A decision intelligence system that explains **why** a startup is likely to fail or succeed."
 )
 
-BACKEND_URL = "http://127.0.0.1:8000/predict"
-
 st.divider()
 
-# ======================================
-# Human-Readable Feature Names
-# ======================================
-FEATURE_NAMES = {
-    "age_first_funding_year": "Early funding access",
-    "age_last_funding_year": "Late funding dependency",
-    "age_first_milestone_year": "Early milestones",
-    "age_last_milestone_year": "Delayed milestones",
-    "relationships": "Founder network strength",
-    "funding_rounds": "Number of funding rounds",
-    "funding_total_usd": "Total funding raised",
-    "milestones": "Business milestones",
-    "avg_participants": "Investor participation",
-    "is_software": "Software startup",
-    "is_web": "Web-based product",
-    "is_mobile": "Mobile product",
-    "is_enterprise": "Enterprise focus",
-    "has_VC": "VC backing",
-    "has_angel": "Angel funding",
-    "is_top500": "Top-500 startup"
-}
+# =========================
+# INPUTS
+# =========================
+st.header("📥 Startup Profile")
 
-# ======================================
-# Inputs
-# ======================================
-st.subheader("📊 Startup Metrics")
+col1, col2 = st.columns(2)
 
-latitude = st.number_input("Latitude", value=37.77)
-longitude = st.number_input("Longitude", value=-122.41)
+with col1:
+    latitude = st.number_input("Latitude", value=37.77)
+    age_first_funding = st.number_input("Age at First Funding", value=2)
+    relationships = st.number_input("Founder Relationships", value=10)
+    funding_total = st.number_input("Total Funding (USD)", value=1_500_000)
+    is_software = st.checkbox("Software Startup", value=True)
+    has_angel = st.checkbox("Angel Investors", value=True)
 
-age_first_funding_year = st.number_input("Age at First Funding (years)", value=2)
-age_last_funding_year = st.number_input("Age at Last Funding (years)", value=5)
+with col2:
+    longitude = st.number_input("Longitude", value=-122.41)
+    funding_rounds = st.number_input("Funding Rounds", value=3)
+    milestones = st.number_input("Milestones Achieved", value=4)
+    has_vc = st.checkbox("VC Backing", value=True)
+    is_top500 = st.checkbox("Top 500 Startup", value=False)
 
-age_first_milestone_year = st.number_input("Age at First Milestone (years)", value=1)
-age_last_milestone_year = st.number_input("Age at Last Milestone (years)", value=4)
-
-relationships = st.number_input("Founder Relationships", value=10)
-funding_rounds = st.number_input("Funding Rounds", value=3)
-funding_total_usd = st.number_input("Total Funding (USD)", value=1_500_000)
-milestones = st.number_input("Milestones Achieved", value=4)
-avg_participants = st.number_input("Avg Investors per Round", value=3)
-
-st.divider()
-
-st.subheader("🏷 Category & Funding")
-
-is_software = st.checkbox("Software", value=True)
-is_web = st.checkbox("Web", value=True)
-is_mobile = st.checkbox("Mobile")
-is_enterprise = st.checkbox("Enterprise", value=True)
-
-has_VC = st.checkbox("VC Funding", value=True)
-has_angel = st.checkbox("Angel Funding", value=True)
-is_top500 = st.checkbox("Top-500 Startup")
-
-st.divider()
-
-# ======================================
-# Payload (FULL – schema safe)
-# ======================================
 payload = {
     "latitude": latitude,
     "longitude": longitude,
-
-    "age_first_funding_year": age_first_funding_year,
-    "age_last_funding_year": age_last_funding_year,
-    "age_first_milestone_year": age_first_milestone_year,
-    "age_last_milestone_year": age_last_milestone_year,
-
+    "age_first_funding_year": age_first_funding,
+    "age_last_funding_year": 5,
+    "age_first_milestone_year": 1,
+    "age_last_milestone_year": 4,
     "relationships": relationships,
     "funding_rounds": funding_rounds,
-    "funding_total_usd": funding_total_usd,
+    "funding_total_usd": funding_total,
     "milestones": milestones,
-    "avg_participants": avg_participants,
 
-    "is_CA": 0,
+    "is_software": int(is_software),
+    "is_web": 1,
+    "is_enterprise": 1,
+
+    "has_angel": int(has_angel),
+    "has_VC": int(has_vc),
+    "is_top500": int(is_top500),
+
+    "is_CA": 1,
     "is_NY": 0,
     "is_MA": 0,
     "is_TX": 0,
-    "is_otherstate": 1,
-
-    "is_software": int(is_software),
-    "is_web": int(is_web),
-    "is_mobile": int(is_mobile),
-    "is_enterprise": int(is_enterprise),
+    "is_otherstate": 0,
+    "is_mobile": 0,
     "is_advertising": 0,
     "is_gamesvideo": 0,
     "is_ecommerce": 0,
     "is_biotech": 0,
     "is_consulting": 0,
     "is_othercategory": 0,
-
-    "has_VC": int(has_VC),
-    "has_angel": int(has_angel),
     "has_roundA": 1,
     "has_roundB": 0,
     "has_roundC": 0,
     "has_roundD": 0,
-
-    "is_top500": int(is_top500),
+    "avg_participants": 3
 }
 
-# ======================================
-# Predict
-# ======================================
-if st.button("🔮 Predict Failure Risk"):
-    with st.spinner("Analyzing startup risk..."):
-        response = requests.post(BACKEND_URL, json=payload)
+# =========================
+# PREDICTION
+# =========================
+st.divider()
 
-    if response.status_code != 200:
-        st.error("Backend rejected the request.")
-        st.stop()
+if st.button("🔍 Analyze Startup Risk", use_container_width=True):
 
+    response = requests.post(API_URL, json=payload)
     result = response.json()
 
-    prob = result["failure_probability"]
-    risk = result["risk_level"]
+    # -------------------------
+    # RISK SUMMARY
+    # -------------------------
+    st.header("📊 Risk Assessment")
 
-    st.subheader("📊 Risk Assessment")
+    risk_pct = round(result["failure_probability"] * 100, 2)
+    risk_level = result["risk_level"]
 
-    if risk == "Low Risk":
-        st.success(f"🟢 Low Risk — {prob:.2%}")
-    elif risk == "Medium Risk":
-        st.warning(f"🟡 Medium Risk — {prob:.2%}")
+    if risk_level == "High Risk":
+        st.error(f"🔴 HIGH RISK — {risk_pct}% probability of failure")
+    elif risk_level == "Medium Risk":
+        st.warning(f"🟡 MEDIUM RISK — {risk_pct}% probability of failure")
     else:
-        st.error(f"🔴 High Risk — {prob:.2%}")
+        st.success(f"🟢 LOW RISK — {risk_pct}% probability of failure")
 
-    st.progress(prob)
+    st.divider()
 
-    # ======================================
-    # TOP RISK FACTORS
-    # ======================================
-    st.subheader("🔴 Top Risk Drivers")
+    # -------------------------
+    # EXPLANATION
+    # -------------------------
+    st.subheader("🧠 Why the model thinks this")
 
-    for f in result["top_risk_factors"]:
-        if f in FEATURE_NAMES:
-            st.write(f"• {FEATURE_NAMES[f]}")
+    col_risk, col_safe = st.columns(2)
 
-    st.subheader("🟢 Protective Factors")
+    with col_risk:
+        st.markdown("### ⚠️ Risk Contributors")
+        for r in result["top_risk_factors"]:
+            st.write("•", r)
 
-    for f in result["positive_signals"]:
-        if f in FEATURE_NAMES:
-            st.write(f"• {FEATURE_NAMES[f]}")
+    with col_safe:
+        st.markdown("### 🛡️ Protective Contributors")
+        for p in result["top_protective_factors"]:
+            st.write("•", p)
+
+    # -------------------------
+    # RISK CONTRIBUTION CHART
+    # -------------------------
+    st.divider()
+    st.subheader("📈 Risk Contribution Breakdown")
+
+    contribution_data = []
+
+    for r in result["top_risk_factors"]:
+        contribution_data.append({"Factor": r, "Impact": 1})
+
+    for p in result["top_protective_factors"]:
+        contribution_data.append({"Factor": p, "Impact": -1})
+
+    df = pd.DataFrame(contribution_data)
+
+    st.bar_chart(
+        df.set_index("Factor"),
+        height=400
+    )
+
+    st.caption(
+        "Positive bars increase failure risk. Negative bars reduce risk. "
+        "Bar height represents relative influence on the decision."
+    )
